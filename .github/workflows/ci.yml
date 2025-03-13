@@ -1,0 +1,56 @@
+name: Deploy Node.js App with SSHFS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    # If you experience deployment issues, try changing
+    # the runner to a different one.
+    # Other runners are available: runner-4104-2, runner-4104-3
+    runs-on: [self-hosted, runner-4104-1]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Cleanup previous container
+        run: |
+          # Search for a previous container
+          PREV_CONTAINER=$(docker ps -aq -f "name=app-grupo-${{secrets.GROUP_ID}}")
+          if [ -n "$PREV_CONTAINER" ]; then
+            echo "Stopping previous container: $PREV_CONTAINER"
+            docker stop "$PREV_CONTAINER"
+            docker rm "$PREV_CONTAINER"
+          else
+            echo "No previous container found."
+          fi
+
+      - name: Create .env file
+        run: |
+          echo "NODE_ENV=production" > .env
+          echo "HOST_PORT=${{ secrets.HOST_PORT }}" >> .env
+          echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> .env
+          echo "SSH_USER=${{ secrets.SSH_USER }}" >> .env
+          echo "SSH_PRIVATE_KEY=${{ secrets.SSH_PRIVATE_KEY }}" >> .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env          
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env          
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "INIT_DB=${{ vars.INIT_DB }}" >> .env
+          echo "SESSIONS_SECRET=${{ secrets.SESSIONS_SECRET }}" >> .env
+          echo "SSHFS_REMOTE_PATH=fs" >> .env
+          echo "SSHFS_LOCAL_PATH=/app/files" >> .env
+
+      - name: Build and Run Docker Container
+        run: |
+          docker build -t app-grupo-${{secrets.GROUP_ID}} .
+          docker run -d --privileged \
+            -v /dev/fuse:/dev/fuse \
+            --env-file .env \
+            -p ${{ secrets.HOST_PORT }}:3000 \
+            --name app-grupo-${{secrets.GROUP_ID}} \
+            app-grupo-${{secrets.GROUP_ID}}
+        
