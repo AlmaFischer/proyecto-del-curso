@@ -5,6 +5,8 @@ const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
 
+
+
 // Importar express-session y session-file-store
 const session = require("express-session");
 const FileStore = require("session-file-store")(session);
@@ -142,6 +144,39 @@ app.get("/home", (req, res) => {
   // Asumiendo que el archivo se llama "home.html.ejs" en ./views.
   res.render("home", { title: "DocLocker" });
 });
+
+const filePath = path.join(FILES_DIR, "grupo07_docmanifest.json");
+const jsonData = JSON.parse(fs.readFileSync(filePath, "utf8"));
+
+// Insertar los clientes en la base de datos
+async function createUsers() {
+  try {
+    for (const document of jsonData) {
+      // Asegúrate de que 'entities' existe en 'document'
+      if (document.entities) {
+        for (const entity of document.entities) {
+          const email =     entity.email;
+          const username =  email.split("@")[0]; // Usamos el correo para crear un nombre de usuario básico
+          const password = "defaultpassword"; // Contraseña por defecto !!!!!!!!CAMBIAR!!!!!!!! super inseguro vamos a morir muerte death
+          const filename =  entity.file || ''; // Asegúrate de que 'file' existe
+
+          // Insertar el usuario en la base de datos
+          await pool.query(
+            "INSERT INTO users (username, password, email, file) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING",
+            [username, password, email, filename]
+          );
+        }
+      }
+    }
+    console.log("Usuarios creados exitosamente");
+  } catch (error) {
+    console.error("Error al crear usuarios:", error.message);
+  }
+}
+
+
+// Ejecutar la función para crear los usuarios
+createUsers(); //usuarios ya creados
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
