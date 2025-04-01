@@ -1,15 +1,42 @@
--- Eliminar la tabla si ya existe
+-- Eliminar tablas si existen
+DROP TABLE IF EXISTS document_entities;
+DROP TABLE IF EXISTS entities;
+DROP TABLE IF EXISTS documents;
 DROP TABLE IF EXISTS users;
 
--- Crear la tabla users
+-- Crear la tabla de usuarios
 CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(50) NOT NULL UNIQUE,
-  password VARCHAR(100) NOT NULL,  -- Corregido el error aquí
-  email VARCHAR(200) NOT NULL,
-  file VARCHAR(100) NOT NULL
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    email VARCHAR(200) NOT NULL UNIQUE
 );
 
--- Insertar el usuario admin con la contraseña admin.123
-INSERT INTO users (username, password, email, file)
-VALUES ('admin', 'admin.123', 'admin@admin.com', 'admin_file.pdf');
+-- Crear la tabla de documentos
+CREATE TABLE documents (
+    id SERIAL PRIMARY KEY,
+    document_type VARCHAR(50) NOT NULL,
+    file VARCHAR(100) NOT NULL,
+    pdf_path TEXT NOT NULL,
+    sha256 CHAR(64) NOT NULL UNIQUE
+);
+
+-- Crear la tabla de entidades (puede ser una empresa o una persona)
+CREATE TABLE entities (
+    id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE REFERENCES users(id) ON DELETE SET NULL,  -- Relación con usuario
+    name VARCHAR(255),
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    email VARCHAR(200) NOT NULL UNIQUE,
+    nationality VARCHAR(100),
+    address TEXT,
+    representative VARCHAR(255)
+);
+
+-- Tabla intermedia para la relación muchos a muchos entre documentos y entidades
+CREATE TABLE document_entities (
+    document_id INT REFERENCES documents(id) ON DELETE CASCADE,
+    entity_id INT REFERENCES entities(id) ON DELETE CASCADE,
+    PRIMARY KEY (document_id, entity_id)
+);

@@ -5,8 +5,6 @@ const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
 
-
-
 // Importar express-session y session-file-store
 const session = require("express-session");
 const FileStore = require("session-file-store")(session);
@@ -17,9 +15,7 @@ app.use(express.json());
 // Configurar el motor de vistas EJS
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
-app.use(expressLayouts); // Activamos el middleware para layouts
-
-// Opcional: definir el layout por defecto (busca views/layout.ejs)
+app.use(expressLayouts);
 app.set('layout', 'layout');
 
 // Configurar Multer para manejar archivos en memoria
@@ -27,23 +23,20 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Configurar el almacenamiento de sesiones en el sistema de archivos
 const sessionsDir = path.join(__dirname, "sessions");
-// Asegurarse de que el directorio existe
 if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
 
 app.use(session({
   store: new FileStore({ path: sessionsDir }),
-  secret: process.env.SESSIONS_SECRET, // Reemplaza con una cadena secreta segura en producción
+  secret: process.env.SESSIONS_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 60 * 60 * 1000 } // Opcional: 1 hora de duración
+  cookie: { maxAge: 60 * 60 * 1000 }
 }));
 
 // Directorio local para almacenar archivos
 const FILES_DIR = path.join(__dirname, "files");
-
-// Asegurarse de que el directorio exista
 if (!fs.existsSync(FILES_DIR)) {
   fs.mkdirSync(FILES_DIR, { recursive: true });
 }
@@ -58,65 +51,79 @@ const pool = new Pool({
 });
 
 /**
- * Endpoint para subir archivos al servidor local.
- * Guarda el archivo en ./files con su nombre original.
+ * Middleware para verificar si el usuario está autenticado
  */
-app.post("/upload", upload.single("file"), async (req, res) => {
-  if (!req.file)
-    return res.status(400).json({ error: "No file uploaded" });
+function isAuthenticated(req, res, next) {
+  if (req.session.userId) {
+    return next();
+  }
+  res.status(401).json({ error: "Unauthorized" });
+}
 
+/**
+ * Endpoint para subir archivos al servidor local.
+ */
+app.post("/upload", upload.single("file"), isAuthenticated, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   const filePath = path.join(FILES_DIR, req.file.originalname);
-  fs.writeFile(filePath, req.file.buffer, (err) => {
-    if (err) {
-      return res.status(500).json({ error: "Error saving file", details: err.message });
-    }
+  fs.writeFile(filePath, req.file.buffer, async (err) => {
+    if (err) return res.status(500).json({ error: "Error saving file", details: err.message });
     res.json({ success: true, file: req.file.originalname });
   });
 });
 
 /**
- * Endpoint para descargar archivos desde el servidor local.
+ * Endpoint para descargar archivos, solo si pertenecen al usuario autenticado.
  */
-app.get("/download/:filename", (req, res) => {
-  const filePath = path.join(FILES_DIR, req.params.filename);
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "File not found" });
+app.get("/download/:filename", isAuthenticated, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const userId = req.session.userId;
+    const result = await pool.query(
+      `SELECT d.pdf_path FROM documents d
+       JOIN document_entities de ON d.id = de.document_id
+       JOIN entities e ON de.entity_id = e.id
+       WHERE e.user_id = $1 AND d.file = $2`,
+      [userId, filename]
+    );
+    if (result.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    res.download(path.join(FILES_DIR, filename + '.pdf'));
+  } catch (error) {
+    res.status(500).json({ error: "Error downloading file", details: error.message });
   }
-  res.download(filePath, req.params.filename, (err) => {
-    if (err) {
-      res.status(500).json({ error: "Error downloading file", details: err.message });
-    }
-  });
 });
 
 /**
- * Endpoint para listar los archivos disponibles en el directorio local.
+ * Endpoint para listar archivos del usuario autenticado.
  */
-app.get("/files", (req, res) => {
-  fs.readdir(FILES_DIR, (err, files) => {
-    if (err) {
-      return res.status(500).json({ error: "Error listing files", details: err.message });
-    }
-    res.json({ success: true, files });
-  });
+app.get("/files", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const result = await pool.query(
+      `SELECT d.file FROM documents d
+       JOIN document_entities de ON d.id = de.document_id
+       JOIN entities e ON de.entity_id = e.id
+       WHERE e.user_id = $1`,
+      [userId]
+    );
+    res.json({ success: true, files: result.rows.map(row => row.file) });
+  } catch (error) {
+    res.status(500).json({ error: "Error listing files", details: error.message });
+  }
 });
 
 /**
- * Endpoint de login (POST) para validar credenciales.
+ * Endpoint de login para validar credenciales.
  */
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ result: false, error: "Missing username or password" });
-  }
-
+  if (!username || !password) return res.status(400).json({ result: false, error: "Missing username or password" });
   try {
-    const result = await pool.query(
-      "SELECT * FROM users WHERE username = $1 AND password = $2",
-      [username, password]
-    );
-
+    const result = await pool.query("SELECT id FROM users WHERE username = $1 AND password = $2", [username, password]);
     if (result.rows.length > 0) {
+      req.session.userId = result.rows[0].id;
       res.json({ result: true });
     } else {
       res.json({ result: false });
@@ -127,9 +134,6 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  // Asumiendo que el archivo se llama "login.html.ejs" en ./views.
-  // Si se usa res.render('login') y el motor de vistas es ejs, por defecto se buscará "login.ejs".
-  // Si deseas mantener la extensión "html.ejs", puedes invocar res.render('login.html').
   res.render("login", { title: "DocLocker Login" });
 });
 
@@ -137,46 +141,9 @@ app.get("/", (req, res) => {
   res.redirect("/login");
 });
 
-/**
- * Nuevo endpoint GET /home para renderizar la vista de pruebas de la API.
- */
 app.get("/home", (req, res) => {
-  // Asumiendo que el archivo se llama "home.html.ejs" en ./views.
   res.render("home", { title: "DocLocker" });
 });
-
-const filePath = path.join(FILES_DIR, "grupo07_docmanifest.json");
-const jsonData = JSON.parse(fs.readFileSync(filePath, "utf8"));
-
-// Insertar los clientes en la base de datos
-async function createUsers() {
-  try {
-    for (const document of jsonData) {
-      // Asegúrate de que 'entities' existe en 'document'
-      if (document.entities) {
-        for (const entity of document.entities) {
-          const email =     entity.email;
-          const username =  email.split("@")[0]; // Usamos el correo para crear un nombre de usuario básico
-          const password = "defaultpassword"; // Contraseña por defecto !!!!!!!!CAMBIAR!!!!!!!! super inseguro vamos a morir muerte death
-          const filename =  entity.file || ''; // Asegúrate de que 'file' existe
-
-          // Insertar el usuario en la base de datos
-          await pool.query(
-            "INSERT INTO users (username, password, email, file) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING",
-            [username, password, email, filename]
-          );
-        }
-      }
-    }
-    console.log("Usuarios creados exitosamente");
-  } catch (error) {
-    console.error("Error al crear usuarios:", error.message);
-  }
-}
-
-
-// Ejecutar la función para crear los usuarios
-createUsers(); //usuarios ya creados
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
