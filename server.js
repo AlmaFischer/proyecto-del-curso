@@ -52,6 +52,7 @@ const pool = new Pool({
 
 /**
  * Middleware para verificar si el usuario está autenticado
+ * 
  */
 function isAuthenticated(req, res, next) {
   if (req.session.userId) {
@@ -79,17 +80,31 @@ app.get("/download/:filename", isAuthenticated, async (req, res) => {
   try {
     const { filename } = req.params;
     const userId = req.session.userId;
-    const result = await pool.query(
-      `SELECT d.pdf_path FROM documents d
+
+    // Extraer el nombre base sin extensión
+    const baseName = path.parse(filename).name;
+
+    // Verificar permisos en la base de datos
+    const dbResult = await pool.query(
+      `SELECT d.file FROM documents d
        JOIN document_entities de ON d.id = de.document_id
        JOIN entities e ON de.entity_id = e.id
        WHERE e.user_id = $1 AND d.file = $2`,
-      [userId, filename]
+      [userId, baseName]
     );
-    if (result.rows.length === 0) {
+
+    if (dbResult.rows.length === 0) {
       return res.status(403).json({ error: "Access denied" });
     }
-    res.download(path.join(FILES_DIR, filename + '.pdf'));
+
+    // Verificar existencia física del archivo
+    const filePath = path.join(FILES_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Permitir descarga
+    res.download(filePath);
   } catch (error) {
     res.status(500).json({ error: "Error downloading file", details: error.message });
   }
@@ -101,19 +116,44 @@ app.get("/download/:filename", isAuthenticated, async (req, res) => {
 app.get("/files", isAuthenticated, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const result = await pool.query(
+    
+    // Obtener nombres base desde la base de datos
+    const dbResult = await pool.query(
       `SELECT d.file FROM documents d
        JOIN document_entities de ON d.id = de.document_id
        JOIN entities e ON de.entity_id = e.id
        WHERE e.user_id = $1`,
       [userId]
     );
-    res.json({ success: true, files: result.rows.map(row => row.file) });
+
+    const availableFiles = [];
+
+    // Verificar existencia física de cada versión
+    for (const row of dbResult.rows) {
+      const baseName = row.file;
+      
+      // Verificar y agregar .md si existe
+      const mdFile = `${baseName}.md`;
+      if (fs.existsSync(path.join(FILES_DIR, mdFile))) {
+        availableFiles.push(mdFile);
+      }
+      
+      // Verificar y agregar .pdf si existe
+      const pdfFile = `${baseName}.pdf`;
+      if (fs.existsSync(path.join(FILES_DIR, pdfFile))) {
+        availableFiles.push(pdfFile);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      files: availableFiles.sort() // Ordenar alfabéticamente
+    });
+    
   } catch (error) {
     res.status(500).json({ error: "Error listing files", details: error.message });
   }
 });
-
 /**
  * Endpoint de login para validar credenciales.
  */
