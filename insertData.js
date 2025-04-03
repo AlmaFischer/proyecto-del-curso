@@ -14,7 +14,6 @@ const FILES_DIR = path.join(__dirname, "files");
 const filePath = path.join(FILES_DIR, "grupo07_docmanifest.json");
 const jsonData = JSON.parse(fs.readFileSync(filePath, "utf8"));
 
-let userCounter = 1; // Contador inicial para generar contraseñas únicas
 
 async function insertData() {
   const client = await pool.connect();
@@ -41,7 +40,7 @@ async function insertData() {
 
         let userId = null;
         if (entity.email) {
-          const password = `${entity.email.split('@')[0]}_${userCounter++}`; // Generar contraseña única
+          const password = `${entity.email.split('@')[0]}_2025`;
           const userRes = await client.query(
             `INSERT INTO users (username, password, email)
              VALUES ($1, $2, $3)

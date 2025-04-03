@@ -107,7 +107,6 @@ app.get("/download/:filename", isAuthenticated, async (req, res) => {
     // Extraer el nombre base sin extensión
     const baseName = path.parse(filename).name;
 
-    // Verificar permisos en la base de datos
     const dbResult = await pool.query(
       `SELECT d.file FROM documents d
        JOIN document_entities de ON d.id = de.document_id
@@ -120,13 +119,11 @@ app.get("/download/:filename", isAuthenticated, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Verificar existencia física del archivo
     const filePath = path.join(FILES_DIR, filename);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: "File not found" });
     }
 
-    // Permitir descarga
     res.download(filePath);
   } catch (error) {
     res.status(500).json({ error: "Error downloading file", details: error.message });
@@ -140,7 +137,6 @@ app.get("/files", isAuthenticated, async (req, res) => {
   try {
     const userId = req.session.userId;
     
-    // Obtener nombres base desde la base de datos
     const dbResult = await pool.query(
       `SELECT d.file FROM documents d
        JOIN document_entities de ON d.id = de.document_id
@@ -151,17 +147,15 @@ app.get("/files", isAuthenticated, async (req, res) => {
 
     const availableFiles = [];
 
-    // Verificar existencia física de cada versión
     for (const row of dbResult.rows) {
       const baseName = row.file;
       
-      // Verificar y agregar .md si existe
       const mdFile = `${baseName}.md`;
       if (fs.existsSync(path.join(FILES_DIR, mdFile))) {
         availableFiles.push(mdFile);
       }
       
-      // Verificar y agregar .pdf si existe
+
       const pdfFile = `${baseName}.pdf`;
       if (fs.existsSync(path.join(FILES_DIR, pdfFile))) {
         availableFiles.push(pdfFile);
@@ -170,7 +164,7 @@ app.get("/files", isAuthenticated, async (req, res) => {
 
     res.json({ 
       success: true, 
-      files: availableFiles.sort() // Ordenar alfabéticamente
+      files: availableFiles.sort()
     });
     
   } catch (error) {
@@ -193,7 +187,6 @@ app.post("/login", async (req, res) => {
   }
 
   try {
-    // Consulta modificada para aceptar username o email
     const result = await pool.query(
       `SELECT id FROM users 
        WHERE (username = $1 OR email = $1) 
