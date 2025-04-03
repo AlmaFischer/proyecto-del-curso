@@ -156,20 +156,42 @@ app.get("/files", isAuthenticated, async (req, res) => {
 });
 /**
  * Endpoint de login para validar credenciales.
+ * Ahora acepta username o email como identificador
  */
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ result: false, error: "Missing username or password" });
+  
+  // Validar campos obligatorios
+  if (!username || !password) {
+    return res.status(400).json({ 
+      result: false, 
+      error: "Falta nombre de usuario/email o contraseña" 
+    });
+  }
+
   try {
-    const result = await pool.query("SELECT id FROM users WHERE username = $1 AND password = $2", [username, password]);
+    // Consulta modificada para aceptar username o email
+    const result = await pool.query(
+      `SELECT id FROM users 
+       WHERE (username = $1 OR email = $1) 
+       AND password = $2`, 
+      [username, password]
+    );
+
     if (result.rows.length > 0) {
       req.session.userId = result.rows[0].id;
       res.json({ result: true });
     } else {
-      res.json({ result: false });
+      res.status(401).json({ 
+        result: false, 
+        error: "Credenciales inválidas" 
+      });
     }
   } catch (error) {
-    res.status(500).json({ result: false, error: error.message });
+    res.status(500).json({ 
+      result: false, 
+      error: "Error en el servidor" 
+    });
   }
 });
 

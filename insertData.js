@@ -49,7 +49,7 @@ async function insertData() {
             `INSERT INTO users (username, password, email)
              VALUES ($1, $2, $3)
              ON CONFLICT (email) DO NOTHING RETURNING id`,
-            [entity.email, 'hashed_password', entity.email]
+            [entity.email.split('@')[0]+entity.email.split('@')[1][0], 'hashed_password', entity.email]
           );
           userId = userRes.rows[0]?.id;
         }
