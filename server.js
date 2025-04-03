@@ -35,6 +35,9 @@ app.use(session({
   cookie: { maxAge: 60 * 60 * 1000 }
 }));
 
+
+
+
 // Directorio local para almacenar archivos
 const FILES_DIR = path.join(__dirname, "files");
 if (!fs.existsSync(FILES_DIR)) {
@@ -229,3 +232,31 @@ app.get("/home", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+const { exec } = require("child_process");
+
+async function checkAndSeedDatabase() {
+  try {
+    const result = await pool.query("SELECT COUNT(*) FROM users");
+    const userCount = parseInt(result.rows[0].count, 10);
+
+    if (userCount === 0) {
+      console.log("Database is empty. Running insertData.js...");
+      exec("node insertData.js", (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error executing insertData.js: ${error.message}`);
+          return;
+        }
+        if (stderr) {
+          console.error(`insertData.js stderr: ${stderr}`);
+        }
+        console.log(`insertData.js output:\n${stdout}`);
+      });
+    } else {
+      console.log("Database already has data. Skipping insertData.js...");
+    }
+  } catch (error) {
+    console.error("Error checking database:", error.message);
+  }
+}
+checkAndSeedDatabase();
