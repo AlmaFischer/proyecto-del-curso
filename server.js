@@ -137,40 +137,100 @@ app.get("/files", isAuthenticated, async (req, res) => {
   try {
     const userId = req.session.userId;
     
-    const dbResult = await pool.query(
-      `SELECT d.file FROM documents d
+    // Primero obtenemos los documentos del usuario con sus metadatos
+    const documentsQuery = await pool.query(
+      `SELECT d.id, d.file, d.document_type 
+       FROM documents d
        JOIN document_entities de ON d.id = de.document_id
        JOIN entities e ON de.entity_id = e.id
        WHERE e.user_id = $1`,
       [userId]
     );
 
-    const availableFiles = [];
+    const filesData = [];
 
-    for (const row of dbResult.rows) {
-      const baseName = row.file;
-      
+    for (const doc of documentsQuery.rows) {
+      const baseName = doc.file;
+      const fileEntry = {
+        documentId: doc.id,
+        documentType: doc.document_type,
+        files: [],
+        comments: []
+      };
+
+      // Verificamos archivos físicos
       const mdFile = `${baseName}.md`;
       if (fs.existsSync(path.join(FILES_DIR, mdFile))) {
-        availableFiles.push(mdFile);
+        fileEntry.files.push(mdFile);
       }
-      
 
       const pdfFile = `${baseName}.pdf`;
       if (fs.existsSync(path.join(FILES_DIR, pdfFile))) {
-        availableFiles.push(pdfFile);
+        fileEntry.files.push(pdfFile);
       }
+
+      // Obtenemos comentarios para este documento
+      if (doc.id) {
+        const commentsQuery = await pool.query(
+          `SELECT c.id, c.content, c.created_at, u.username 
+           FROM comments c
+           JOIN users u ON c.user_id = u.id
+           WHERE c.document_id = $1
+           ORDER BY c.created_at DESC`,
+          [doc.id]
+        );
+        fileEntry.comments = commentsQuery.rows;
+      }
+
+      filesData.push(fileEntry);
     }
 
     res.json({ 
       success: true, 
-      files: availableFiles.sort()
+      data: filesData.sort((a, b) => a.documentType.localeCompare(b.documentType))
     });
     
   } catch (error) {
     res.status(500).json({ error: "Error listing files", details: error.message });
   }
 });
+
+/**
+ * Endpoint para agregar comentarios a archivos.
+ */
+
+app.post("/api/documents/:documentId/comments", isAuthenticated, async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { content } = req.body;
+    const userId = req.session.userId;
+
+    // Validación básica
+    if (!content || content.trim() === "") {
+      return res.status(400).json({ error: "El comentario no puede estar vacío" });
+    }
+
+    // Insertar en la base de datos
+    const result = await pool.query(
+      `INSERT INTO comments (user_id, document_id, content)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [userId, documentId, content.trim()]
+    );
+
+    res.json({ 
+      success: true, 
+      comment: result.rows[0] 
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      error: "Error al crear el comentario", 
+      details: error.message 
+    });
+  }
+});
+
+
 /**
  * Endpoint de login para validar credenciales.
  * Ahora acepta username o email como identificador
@@ -207,6 +267,51 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ 
       result: false, 
       error: "Error en el servidor" 
+    });
+  }
+});
+
+
+// Nuevo endpoint para crear comentarios (colócalo después del endpoint GET /files)
+app.post("/documents/:documentId/comments", isAuthenticated, async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { content } = req.body;
+    const userId = req.session.userId;
+
+    // Validar entrada
+    if (!content || content.trim() === "") {
+      return res.status(400).json({ error: "El comentario no puede estar vacío" });
+    }
+
+    // Insertar en la base de datos
+    const result = await pool.query(
+      `INSERT INTO comments (user_id, document_id, content)
+       VALUES ($1, $2, $3)
+       RETURNING id, content, created_at`,
+      [userId, documentId, content.trim()]
+    );
+
+    // Obtener username del usuario
+    const userResult = await pool.query(
+      `SELECT username FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    const newComment = {
+      ...result.rows[0],
+      username: userResult.rows[0].username
+    };
+
+    res.json({ 
+      success: true,
+      comment: newComment
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      error: "Error al crear el comentario",
+      details: error.message 
     });
   }
 });

@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS document_entities;
 DROP TABLE IF EXISTS entities;
 DROP TABLE IF EXISTS documents;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS comments;
 
 -- Crear la tabla de usuarios
 CREATE TABLE users (
@@ -39,4 +40,13 @@ CREATE TABLE document_entities (
     document_id INT REFERENCES documents(id) ON DELETE CASCADE,
     entity_id INT REFERENCES entities(id) ON DELETE CASCADE,
     PRIMARY KEY (document_id, entity_id)
+);
+
+-- Crear la tabla de comentarios
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Fecha automática al crear
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- Usuario que comenta
+    document_id INT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,  -- Documento relacionado
+    content TEXT NOT NULL  -- Texto del comentario
 );
