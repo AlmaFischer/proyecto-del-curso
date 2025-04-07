@@ -1,0 +1,25 @@
+<!-- views/admin/home.ejs -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title><%= hola %></title>
+    <%- include('../partials/head') %>
+</head>
+<body>
+    <%- include('../partials/admin_navbar') %>
+    
+    <div class="container mt-4">
+        <h2>Bienvenido Administrador</h2>
+        <div id="admin-documents-container"></div>
+    </div>
+
+    <script>
+        // Cargar documentos al iniciar
+        axios.get('/admin/documents')
+          .then(response => {
+            const container = document.getElementById('admin-documents-container');
+            // Implementar lógica de renderizado aquí
+          });
+    </script>
+</body>
+</html>

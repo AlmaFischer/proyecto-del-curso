@@ -22,7 +22,7 @@ async function insertData() {
     await client.query('BEGIN');
 
     await client.query(
-      `INSERT INTO users (username, password, email, IsAdmin)
+      `INSERT INTO users (username, password, email, is_admin)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO NOTHING`,
       ['sg', 'sg_2025', 'sg@gmail.com', true] // Admin user sacar para producción
@@ -61,7 +61,7 @@ async function insertData() {
         if (entity.email) {
           const password = `${entity.email.split('@')[0]}_2025`;
           const userRes = await client.query(
-            `INSERT INTO users (username, password, email, IsAdmin)
+            `INSERT INTO users (username, password, email, is_admin)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (email) DO NOTHING RETURNING id`,
             [entity.email.split('@')[0] + entity.email.split('@')[1][0], password, entity.email, false]

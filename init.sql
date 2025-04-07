@@ -11,7 +11,7 @@ CREATE TABLE users (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(100) NOT NULL,
     email VARCHAR(200) NOT NULL UNIQUE,
-    IsAdmin BOOLEAN NOT NULL DEFAULT FALSE  -- Indica si el usuario es administrador
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE  -- Indica si el usuario es administrador
 );
 
 -- Crear la tabla de documentos

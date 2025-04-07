@@ -1,3 +1,7 @@
+// ============================================
+// SECCIÓN 1: CONFIGURACIÓN INICIAL Y MIDDLEWARES
+// ============================================
+
 const express = require("express");
 const expressLayouts = require("express-ejs-layouts");
 const multer = require("multer");
@@ -35,9 +39,6 @@ app.use(session({
   cookie: { maxAge: 60 * 60 * 1000 }
 }));
 
-
-
-
 // Directorio local para almacenar archivos
 const FILES_DIR = path.join(__dirname, "files");
 if (!fs.existsSync(FILES_DIR)) {
@@ -53,10 +54,11 @@ const pool = new Pool({
   database: process.env.DB_NAME || "postgres"
 });
 
-/**
- * Middleware para verificar si el usuario está autenticado
- * 
- */
+// ============================================
+// SECCIÓN 2: MIDDLEWARES PERSONALIZADOS
+// ============================================
+
+// Middleware para verificar autenticación
 function isAuthenticated(req, res, next) {
   if (req.session.userId) {
     return next();
@@ -64,75 +66,83 @@ function isAuthenticated(req, res, next) {
   res.status(401).json({ error: "Unauthorized" });
 }
 
-/**
- * Endpoint para subir archivos al servidor local.
- */
-app.post("/upload", upload.single("file"), isAuthenticated, async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+// Middleware para verificar admin
+function isAdmin(req, res, next) {
+  if (!req.session.isAdmin) {
+    return res.status(403).json({ error: "Acceso requerido: administrador" });
+  }
+  next();
+}
+
+// ============================================
+// SECCIÓN 3: RUTAS PÚBLICAS
+// ============================================
+
+// redireccion a /login
+app.get("/", (req, res) => {
+  res.redirect("/login");
+});
+
+// render a /login
+app.get("/login", (req, res) => {
+  res.render("login", { title: "DocLocker Login" });
+});
+
+// Endpoint de login para validar credenciales
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
   
-  const userId = req.session.userId;
-  const fileName = path.parse(req.file.originalname).name;
-  
-  try {
-    const dbResult = await pool.query(
-      `SELECT d.id FROM documents d
-       JOIN document_entities de ON d.id = de.document_id
-       JOIN entities e ON de.entity_id = e.id
-       WHERE e.user_id = $1 AND d.file = $2`,
-      [userId, fileName]
-    );
-    
-    if (dbResult.rows.length === 0) {
-      return res.status(403).json({ error: "You do not have permission to upload this file." });
-    }
-    
-    const filePath = path.join(FILES_DIR, req.file.originalname);
-    fs.writeFile(filePath, req.file.buffer, async (err) => {
-      if (err) return res.status(500).json({ error: "Error saving file", details: err.message });
-      res.json({ success: true, file: req.file.originalname });
+  // Validar campos obligatorios
+  if (!username || !password) {
+    return res.status(400).json({ 
+      result: false, 
+      error: "Falta nombre de usuario/email o contraseña" 
     });
-  } catch (error) {
-    res.status(500).json({ error: "Error uploading file", details: error.message });
   }
-});
 
-/**
- * Endpoint para descargar archivos, solo si pertenecen al usuario autenticado.
- */
-app.get("/download/:filename", isAuthenticated, async (req, res) => {
   try {
-    const { filename } = req.params;
-    const userId = req.session.userId;
-
-    // Extraer el nombre base sin extensión
-    const baseName = path.parse(filename).name;
-
-    const dbResult = await pool.query(
-      `SELECT d.file FROM documents d
-       JOIN document_entities de ON d.id = de.document_id
-       JOIN entities e ON de.entity_id = e.id
-       WHERE e.user_id = $1 AND d.file = $2`,
-      [userId, baseName]
+    const result = await pool.query(
+      `SELECT id, is_admin FROM users 
+       WHERE (username = $1 OR email = $1) 
+       AND password = $2`, 
+      [username, password]
     );
 
-    if (dbResult.rows.length === 0) {
-      return res.status(403).json({ error: "Access denied" });
-    }
+    if (result.rows.length > 0) {
+      req.session.userId = result.rows[0].id;
+      req.session.isAdmin = result.rows[0].is_admin;
 
-    const filePath = path.join(FILES_DIR, filename);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File not found" });
-    }
+      const redirectPath = result.rows[0].is_admin ? "/admin/home" : "/home";
+      res.json({ 
+        result: true, 
+        redirect: redirectPath // Enviar ruta al frontend
+      });
 
-    res.download(filePath);
+    } else {
+      res.status(401).json({ 
+        result: false, 
+        error: "Credenciales inválidas" 
+      });
+    }
   } catch (error) {
-    res.status(500).json({ error: "Error downloading file", details: error.message });
+    res.status(500).json({ 
+      result: false, 
+      error: "Error en el servidor" 
+    });
   }
 });
 
-/**
- * Endpoint para listar archivos del usuario autenticado.
- */
+
+
+// ============================================
+// SECCIÓN 4: RUTAS DE USUARIO AUTENTICADO
+// ============================================
+
+app.get("/home",isAuthenticated, (req, res) => {
+  res.render("home", { title: "DocLocker",user: {isAdmin: req.session.isAdmin} });
+});
+
+// Endpoint para listar archivos del usuario autenticado.
 app.get("/files", isAuthenticated, async (req, res) => {
   try {
     const userId = req.session.userId;
@@ -195,10 +205,7 @@ app.get("/files", isAuthenticated, async (req, res) => {
   }
 });
 
-/**
- * Endpoint para agregar comentarios a archivos.
- */
-
+// Endpoint para agregar comentarios a un documento
 app.post("/api/documents/:documentId/comments", isAuthenticated, async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -230,109 +237,131 @@ app.post("/api/documents/:documentId/comments", isAuthenticated, async (req, res
   }
 });
 
-
-/**
- * Endpoint de login para validar credenciales.
- * Ahora acepta username o email como identificador
- */
-app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
-  
-  // Validar campos obligatorios
-  if (!username || !password) {
-    return res.status(400).json({ 
-      result: false, 
-      error: "Falta nombre de usuario/email o contraseña" 
-    });
-  }
-
+// Endpoint para descargar archivos, solo si pertenecen al usuario autenticado.
+app.get("/download/:filename", isAuthenticated, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id FROM users 
-       WHERE (username = $1 OR email = $1) 
-       AND password = $2`, 
-      [username, password]
-    );
-
-    if (result.rows.length > 0) {
-      req.session.userId = result.rows[0].id;
-      res.json({ result: true });
-    } else {
-      res.status(401).json({ 
-        result: false, 
-        error: "Credenciales inválidas" 
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ 
-      result: false, 
-      error: "Error en el servidor" 
-    });
-  }
-});
-
-
-// Nuevo endpoint para crear comentarios (colócalo después del endpoint GET /files)
-app.post("/documents/:documentId/comments", isAuthenticated, async (req, res) => {
-  try {
-    const { documentId } = req.params;
-    const { content } = req.body;
+    const { filename } = req.params;
     const userId = req.session.userId;
 
-    // Validar entrada
-    if (!content || content.trim() === "") {
-      return res.status(400).json({ error: "El comentario no puede estar vacío" });
+    // Extraer el nombre base sin extensión
+    const baseName = path.parse(filename).name;
+
+    const dbResult = await pool.query(
+      `SELECT d.file FROM documents d
+       JOIN document_entities de ON d.id = de.document_id
+       JOIN entities e ON de.entity_id = e.id
+       WHERE e.user_id = $1 AND d.file = $2`,
+      [userId, baseName]
+    );
+
+    if (dbResult.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
-    // Insertar en la base de datos
-    const result = await pool.query(
-      `INSERT INTO comments (user_id, document_id, content)
-       VALUES ($1, $2, $3)
-       RETURNING id, content, created_at`,
-      [userId, documentId, content.trim()]
-    );
+    const filePath = path.join(FILES_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
 
-    // Obtener username del usuario
-    const userResult = await pool.query(
-      `SELECT username FROM users WHERE id = $1`,
-      [userId]
-    );
-
-    const newComment = {
-      ...result.rows[0],
-      username: userResult.rows[0].username
-    };
-
-    res.json({ 
-      success: true,
-      comment: newComment
-    });
-
+    res.download(filePath);
   } catch (error) {
-    res.status(500).json({ 
-      error: "Error al crear el comentario",
-      details: error.message 
-    });
+    res.status(500).json({ error: "Error downloading file", details: error.message });
   }
 });
 
-app.get("/login", (req, res) => {
-  res.render("login", { title: "DocLocker Login" });
+// ============================================
+// SECCIÓN 5: RUTAS DE ADMINISTRADOR
+// ============================================
+
+app.get("/admin/home", isAuthenticated, isAdmin, (req, res) => {
+  res.render("admin/home", {
+    title: "Panel de Administración"
+  });
 });
 
-app.get("/", (req, res) => {
-  res.redirect("/login");
+// Endpoint para listar todos los documentos y sus comentarios
+app.get("/admin/documents", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    // 1. Obtener todos los documentos con comentarios
+    const query = `
+      SELECT d.*, 
+        json_agg(
+          json_build_object(
+            'id', c.id,
+            'content', c.content,
+            'username', u.username,
+            'created_at', c.created_at
+          ) ORDER BY c.created_at DESC
+        ) as comments
+      FROM documents d
+      LEFT JOIN comments c ON d.id = c.document_id
+      LEFT JOIN users u ON c.user_id = u.id
+      GROUP BY d.id
+    `;
+
+    const result = await pool.query(query);
+
+    // 2. Procesar archivos físicos
+    const processedData = result.rows.map(doc => {
+      const baseName = doc.file;
+      return {
+        ...doc,
+        files: [
+          `${baseName}.md`,
+          `${baseName}.pdf`
+        ].filter(file => fs.existsSync(path.join(FILES_DIR, file))),
+        comments: doc.comments.filter(c => c.content) // Filtrar comentarios vacíos
+      };
+    });
+
+    res.json({
+      success: true,
+      data: processedData.sort((a, b) => a.document_type.localeCompare(b.document_type))
+    });
+
+  } catch (error) {
+    handleAdminError(res, error, "Error al listar documentos");
+  }
 });
 
-app.get("/home", (req, res) => {
-  res.render("home", { title: "DocLocker" });
+// Endpoint para subir archivos al servidor local.
+app.post("/upload", upload.single("file"), isAuthenticated, isAdmin, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  
+  const userId = req.session.userId;
+  const fileName = path.parse(req.file.originalname).name;
+  
+  try {
+    const dbResult = await pool.query(
+      `SELECT d.id FROM documents d
+       JOIN document_entities de ON d.id = de.document_id
+       JOIN entities e ON de.entity_id = e.id
+       WHERE e.user_id = $1 AND d.file = $2`,
+      [userId, fileName]
+    );
+    
+    if (dbResult.rows.length === 0) {
+      return res.status(403).json({ error: "You do not have permission to upload this file." });
+    }
+    
+    const filePath = path.join(FILES_DIR, req.file.originalname);
+    fs.writeFile(filePath, req.file.buffer, async (err) => {
+      if (err) return res.status(500).json({ error: "Error saving file", details: err.message });
+      res.json({ success: true, file: req.file.originalname });
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Error uploading file", details: error.message });
+  }
 });
 
+// ============================================
+// SECCIÓN 6: MANEJO DE ERRORES Y UTILIDADES
+// ============================================
+
+// Poblar la base de datos
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
 const { exec } = require("child_process");
-
 async function checkAndSeedDatabase() {
   try {
     const result = await pool.query("SELECT COUNT(*) FROM users");
@@ -358,3 +387,11 @@ async function checkAndSeedDatabase() {
   }
 }
 checkAndSeedDatabase();
+
+function handleAdminError(res, error, message) {
+  console.error(`[ADMIN ERROR] ${message}:`, error);
+  res.status(500).json({ 
+    error: message,
+    details: process.env.NODE_ENV === 'production' ? null : error.message
+  });
+}

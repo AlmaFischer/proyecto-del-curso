@@ -55,7 +55,8 @@
         });
         const resultData = response.data;
         if (resultData.result) {
-          window.location.href = '/home';
+          window.location.href = resultData.redirect;
+          
         } else {
           renderLogin('Credenciales incorrectas. Inténtalo nuevamente.');
         }
