@@ -19,3 +19,6 @@ Si un usuario tiene el correo **"juan.perez@example.com"**, el sistema generará
 > La base de datos se llena al ejecutar "docker compose up", no se vuelve a ejecutar si es que ya esta poblada la BBDD.
 
 
+## Recueros importantes
+acuerdate de sacar a el administrador de install.md
+

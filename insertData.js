@@ -21,6 +21,25 @@ async function insertData() {
   try {
     await client.query('BEGIN');
 
+    await client.query(
+      `INSERT INTO users (username, password, email, IsAdmin)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email) DO NOTHING`,
+      ['sg', 'sg_2025', 'sg@gmail.com', true] // Admin user sacar para producción
+    );
+
+    // revisar si el usuario administrador fue creado correctamente
+    const adminCheck = await client.query(
+      `SELECT id, username, email FROM users WHERE username = 'sg'`
+    );
+    if (adminCheck.rows.length > 0) {
+      console.log('✅ Usuario administrador creado correctamente:');
+      console.log(adminCheck.rows[0]);
+    } else {
+      console.log('❌ No se pudo crear el usuario administrador');
+    }
+
+
     for (const doc of jsonData) {
       const docRes = await client.query(
         `INSERT INTO documents (document_type, file, pdf_path, sha256)
@@ -42,10 +61,10 @@ async function insertData() {
         if (entity.email) {
           const password = `${entity.email.split('@')[0]}_2025`;
           const userRes = await client.query(
-            `INSERT INTO users (username, password, email)
-             VALUES ($1, $2, $3)
+            `INSERT INTO users (username, password, email, IsAdmin)
+             VALUES ($1, $2, $3, $4)
              ON CONFLICT (email) DO NOTHING RETURNING id`,
-            [entity.email.split('@')[0] + entity.email.split('@')[1][0], password, entity.email]
+            [entity.email.split('@')[0] + entity.email.split('@')[1][0], password, entity.email, false]
           );
           userId = userRes.rows[0]?.id;
         }
