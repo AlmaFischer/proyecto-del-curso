@@ -1,25 +1,284 @@
-<!-- views/admin/home.ejs -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title><%= hola %></title>
-    <%- include('../partials/head') %>
-</head>
-<body>
-    <%- include('../partials/admin_navbar') %>
-    
-    <div class="container mt-4">
-        <h2>Bienvenido Administrador</h2>
-        <div id="admin-documents-container"></div>
-    </div>
+<div id="admin app"></div>
 
-    <script>
-        // Cargar documentos al iniciar
-        axios.get('/admin/documents')
-          .then(response => {
-            const container = document.getElementById('admin-documents-container');
-            // Implementar lógica de renderizado aquí
-          });
-    </script>
-</body>
-</html>
+<script>
+  // Esperamos a que el DOM esté completamente cargado
+  document.addEventListener("DOMContentLoaded", () => {
+
+    // Accedemos a lit-html expuesto globalmente en window.litHtml
+    const { html, render } = window.litHtml;
+    const appContainer = document.getElementById('admin app');
+
+    // Estado de la aplicación: mensajes y resultados de cada prueba.
+    const state = {
+      uploadMessage: '',
+      downloadMessage: '',
+      filesList: null,
+      newComment: '',
+      expandedDocumentId: null
+    };
+
+    // Plantilla principal con secciones para probar cada endpoint.
+    const template = (state) => html`
+      <div class="container">
+        <!-- Título general -->
+        <div class="row mb-4">
+          <div class="col">
+            <label class="form-label fs-2">DocLocker - Home Admin | API Test Page</label>
+          </div>
+        </div>
+
+        <!-- Sección para probar POST /upload -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card shadow-sm">
+              <div class="card-header bg-primary text-white">
+                <label class="mb-0">Subir Archivo (POST /upload)</label>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <input id="upload-file" type="file" class="form-control" />
+                </div>
+                <div class="d-grid">
+                  <button @click=${uploadFile} class="btn btn-primary">Subir Archivo</button>
+                </div>
+                ${state.uploadMessage 
+                  ? html`<div class="mt-2 alert alert-info">${state.uploadMessage}</div>` 
+                  : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección para probar GET /download/:filename -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card shadow-sm">
+              <div class="card-header bg-success text-white">
+                <label class="mb-0">Descargar Archivo (ADMIN GET /admin/download/:filename)</label>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <input id="download-filename" type="text" placeholder="Nombre del archivo" class="form-control" />
+                </div>
+                <div class="d-grid">
+                  <button @click=${downloadFile} class="btn btn-success">Descargar Archivo</button>
+                </div>
+                ${state.downloadMessage 
+                ? html`<div class="mt-2 alert ${state.downloadMessage.includes('Error') 
+                    ? 'alert-danger' 
+                    : 'alert-info'}">${state.downloadMessage}</div>` 
+                : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección para probar GET /files -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card shadow-sm">
+              <div class="card-header bg-secondary text-white">
+                <label class="mb-0">Listar Archivos (GET /files)</label>
+              </div>
+              <div class="card-body">
+                <div class="d-grid mb-3">
+                  <button @click=${listFiles} class="btn btn-secondary">Listar Archivos</button>
+                </div>
+                <div>
+                  ${state.filesList 
+                    ? html`
+                        <div class="list-group">
+                          ${state.filesList.map(document => html`
+                            <div class="list-group-item">
+                              <!-- Encabezado del documento -->
+                              <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                  <span class="badge bg-primary me-2">${document.documentType}</span>
+                                  ${document.files.join(', ')}
+                                </div>
+                                <button 
+                                  class="btn btn-sm btn-outline-secondary"
+                                  @click=${() => toggleComments(document.documentId)}
+                                >
+                                  ${state.expandedDocumentId === document.documentId ? 'Ocultar' : 'Ver'} comentarios
+                                </button>
+                              </div>
+                              
+                              <!-- Comentarios (se muestra solo si está expandido) -->
+                              ${state.expandedDocumentId === document.documentId ? html`
+                                <div class="mt-3">
+                                  <h6 class="mb-2">Comentarios:</h6>
+                                  ${document.comments.length > 0 
+                                    ? html`
+                                        <div class="list-group">
+                                          ${document.comments.map(comment => html`
+                                            <div class="list-group-item">
+                                              <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                  <strong>${comment.username}</strong>
+                                                  <p class="mb-0">${comment.content}</p>
+                                                </div>
+                                                <small class="text-muted">
+                                                  ${new Date(comment.created_at).toLocaleString()}
+                                                </small>
+                                              </div>
+                                            </div>
+                                          `)}
+                                        </div>
+                                      `
+                                    : html`<div class="text-muted">No hay comentarios</div>`
+                                  }
+                                </div>
+                                
+                              ` : ''}
+                              <div class="mt-3">
+                                <!-- ... (comentarios existentes) -->
+
+                                <!-- Formulario para nuevo comentario -->
+                                <div class="mt-4">
+                                  <textarea 
+                                    class="form-control mb-2"
+                                    placeholder="Escribe tu comentario..."
+                                    rows="2"
+                                    .value=${state.newComment}
+                                    @input=${(e) => state.newComment = e.target.value}
+                                  ></textarea>
+                                  <button 
+                                    class="btn btn-primary btn-sm"
+                                    @click=${() => addComment(document.documentId)}
+                                  >
+                                    Enviar comentario
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          `)}
+                        </div>
+                      `
+                    : html`<div class="alert alert-secondary">No hay archivos listados.</div>`
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Función para actualizar la vista
+    function update() {
+      render(template(state), appContainer);
+    }
+
+    // Función para manejar la subida de archivos
+    async function uploadFile() {
+      const fileInput = document.getElementById('upload-file');
+      const file = fileInput.files[0];
+      if (!file) {
+        state.uploadMessage = 'Por favor, seleccione un archivo.';
+        return update();
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const response = await axios.post('/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        state.uploadMessage = response.data.success
+          ? `Archivo "${response.data.file}" subido correctamente.`
+          : 'Error al subir el archivo.';
+      } catch (error) {
+        state.uploadMessage = `Error: ${error.response ? error.response.data.error : error.message}`;
+      }
+      update();
+    }
+
+    // Función para manejar la descarga de un archivo
+
+    async function downloadFile() {
+  const filename = document.getElementById('download-filename').value.trim();
+  if (!filename) {
+    state.downloadMessage = 'Ingrese el nombre del archivo a descargar.';
+    return update();
+  }
+
+  try {
+    const response = await axios.get(`/admin/download/${encodeURIComponent(filename)}`, {
+      responseType: 'blob',
+      validateStatus: (status) => status === 200 || (status >= 400 && status < 500)
+    });
+
+    if (response.status === 200) {
+      // Crear enlace de descarga
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      state.downloadMessage = 'Descarga iniciada...';
+    } else {
+      // Manejar errores de la API
+      const errorData = JSON.parse(await response.data.text());
+      state.downloadMessage = `Error: ${errorData.error || 'Error desconocido'}`;
+    }
+  } catch (error) {
+    state.downloadMessage = `Error: ${error.message}`;
+  }
+  update();
+}
+
+    // Función para listar archivos disponibles
+    async function listFiles() {
+      try { 
+        const response = await axios.get(`files`);
+        if (response.data.success) {
+          state.filesList = response.data.data; // Cambia 'files' por 'data'
+        } else {
+          state.filesList = [];
+        }
+      } catch (error) {
+        state.filesList = [];
+        state.uploadMessage = `Error: ${error.response ? error.response.data.error : error.message}`;
+      }
+      update();
+    }
+
+    // Función para expandir/colapsar comentarios
+    function toggleComments(documentId) {
+      state.expandedDocumentId = state.expandedDocumentId === documentId 
+        ? null 
+        : documentId;
+      update();
+    }
+
+    async function addComment(documentId) {
+      if (!state.newComment.trim()) {
+        alert("El comentario no puede estar vacío");
+        return;
+      }
+
+      try {
+        const response = await axios.post(
+          `/api/documents/${documentId}/comments`,
+          { content: state.newComment }
+        );
+
+        if (response.data.success) {
+          // Actualizar la lista de comentarios localmente
+          const document = state.filesList.find(doc => doc.documentId === documentId);
+          document.comments.unshift(response.data.comment); // Agregar al inicio
+          state.newComment = ""; // Limpiar el textarea
+          update();
+        }
+      } catch (error) {
+        alert(`Error: ${error.response?.data.error || error.message}`);
+      }
+    } 
+
+
+    // Inicializar la vista
+    update();
+  });
+</script>

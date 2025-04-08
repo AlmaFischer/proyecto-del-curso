@@ -182,7 +182,7 @@ app.get("/files", isAuthenticated, async (req, res) => {
       // Obtenemos comentarios para este documento
       if (doc.id) {
         const commentsQuery = await pool.query(
-          `SELECT c.id, c.content, c.created_at, u.username 
+          `SELECT DISTINCT c.id, c.content, c.created_at, u.username 
            FROM comments c
            JOIN users u ON c.user_id = u.id
            WHERE c.document_id = $1
@@ -280,47 +280,108 @@ app.get("/admin/home", isAuthenticated, isAdmin, (req, res) => {
 });
 
 // Endpoint para listar todos los documentos y sus comentarios
-app.get("/admin/documents", isAuthenticated, isAdmin, async (req, res) => {
+app.get("/admin/files", isAuthenticated,isAdmin, async (req, res) => {
   try {
-    // 1. Obtener todos los documentos con comentarios
-    const query = `
-      SELECT d.*, 
-        json_agg(
-          json_build_object(
-            'id', c.id,
-            'content', c.content,
-            'username', u.username,
-            'created_at', c.created_at
-          ) ORDER BY c.created_at DESC
-        ) as comments
-      FROM documents d
-      LEFT JOIN comments c ON d.id = c.document_id
-      LEFT JOIN users u ON c.user_id = u.id
-      GROUP BY d.id
-    `;
+    const userId = req.session.userId;
+    
+    // Primero obtenemos los documentos del usuario con sus metadatos
+    const documentsQuery = await pool.query(
+      `SELECT DISTINCT d.id, d.file, d.document_type 
+       FROM documents d
+       JOIN document_entities de ON d.id = de.document_id
+       JOIN entities e ON de.entity_id = e.id`,
+      []
+    );
 
-    const result = await pool.query(query);
+    const filesData = [];
 
-    // 2. Procesar archivos físicos
-    const processedData = result.rows.map(doc => {
+    for (const doc of documentsQuery.rows) {
       const baseName = doc.file;
-      return {
-        ...doc,
-        files: [
-          `${baseName}.md`,
-          `${baseName}.pdf`
-        ].filter(file => fs.existsSync(path.join(FILES_DIR, file))),
-        comments: doc.comments.filter(c => c.content) // Filtrar comentarios vacíos
+      const fileEntry = {
+        documentId: doc.id,
+        documentType: doc.document_type,
+        files: [],
+        comments: []
       };
-    });
 
-    res.json({
-      success: true,
-      data: processedData.sort((a, b) => a.document_type.localeCompare(b.document_type))
+      // Verificamos archivos físicos
+      const mdFile = `${baseName}.md`;
+      if (fs.existsSync(path.join(FILES_DIR, mdFile))) {
+        fileEntry.files.push(mdFile);
+      }
+
+      const pdfFile = `${baseName}.pdf`;
+      if (fs.existsSync(path.join(FILES_DIR, pdfFile))) {
+        fileEntry.files.push(pdfFile);
+      }
+
+      // Obtenemos comentarios para este documento
+      if (doc.id) {
+        const commentsQuery = await pool.query(
+          `SELECT c.id, c.content, c.created_at, u.username 
+           FROM comments c
+           JOIN users u ON c.user_id = u.id
+           WHERE c.document_id = $1
+           ORDER BY c.created_at DESC`,
+          [doc.id]
+        );
+        fileEntry.comments = commentsQuery.rows;
+      }
+
+      filesData.push(fileEntry);
+    }
+
+    res.json({ 
+      success: true, 
+      data: filesData.sort((a, b) => a.documentType.localeCompare(b.documentType))
     });
+    
+  } catch (error) {
+    res.status(500).json({ error: "Error listing files", details: error.message });
+  }
+});
+
+// Endpoint para descargar archivos.
+app.get("/admin/download/:filename", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // 1. Verificar existencia del registro en la base de datos
+    const baseName = path.parse(filename).name; // Extraer nombre sin extensión
+    
+    const documentCheck = await pool.query(
+      "SELECT file FROM documents WHERE file = $1",
+      [baseName]
+    );
+
+    // 2. Validar que el documento existe en los registros
+    if (documentCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        error: "Documento no registrado en el sistema",
+        details: `El archivo ${baseName} no existe en la base de datos`
+      });
+    }
+
+    // 3. Verificar existencia física del archivo
+    const filePath = path.join(FILES_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        error: "Archivo no encontrado",
+        details: `El archivo ${filename} no existe en el servidor`
+      });
+    }
+
+    // 4. Descargar archivo
+    res.download(filePath);
 
   } catch (error) {
-    handleAdminError(res, error, "Error al listar documentos");
+    console.error("[ADMIN DOWNLOAD ERROR]", error);
+    res.status(500).json({
+      error: "Error en la descarga",
+      details: process.env.NODE_ENV === 'development' 
+        ? error.message 
+        : 'Contacte al equipo técnico'
+    });
   }
 });
 

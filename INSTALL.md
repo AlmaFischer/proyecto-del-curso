@@ -21,4 +21,5 @@ Si un usuario tiene el correo **"juan.perez@example.com"**, el sistema generará
 
 ## Recueros importantes
 acuerdate de sacar a el administrador de install.md
+revisar los comments, cualquier persona puede comentar cualquer documento
 
