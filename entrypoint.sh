@@ -10,12 +10,19 @@ if [ "$NODE_ENV" = "production" ]; then
   echo "Modo production: montando sistema de archivos remoto con sshfs..."
 
   # Verifica si se pasó la variable SSH_PRIVATE_KEY y crea el archivo de clave usando SSH_KEY_PATH
-  if [ -n "$SSH_PRIVATE_KEY" ]; then
-    echo "Creando archivo de clave privada en $SSH_KEY_PATH"
-    echo "$SSH_PRIVATE_KEY" > "$SSH_KEY_PATH"
+  if [ -n "$SSH_PRIVATE_KEY_BASE64" ]; then
+    echo "Creando archivo de clave privada en $SSH_KEY_PATH desde Base64"
+    echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > "$SSH_KEY_PATH"
+    
     chmod 600 "$SSH_KEY_PATH"
+    
+    # Debug: Mostrar la clave privada
+    # cat "$SSH_KEY_PATH"
+
+    # Debug: Validar la clave privada
+    ssh-keygen -lf "$SSH_KEY_PATH"
   else
-    echo "No se proporcionó SSH_PRIVATE_KEY. Asegúrate de inyectar el secreto."
+    echo "No se proporcionó SSH_PRIVATE_KEY_BASE64. Asegúrate de inyectar el secreto."
     exit 1
   fi
 
@@ -24,8 +31,12 @@ if [ "$NODE_ENV" = "production" ]; then
     echo "Montando sistema de archivos remoto con sshfs..."
     # Crear el directorio local de montaje si no existe
     mkdir -p "$SSHFS_LOCAL_PATH"
-    
+
+    # Debug: Mostrar la ruta de montaje
+    # echo "$SSH_USER@$SSH_HOST:$SSHFS_REMOTE_PATH" "$SSHFS_LOCAL_PATH"
+  
     # Realiza el montaje con sshfs, deshabilitando la comprobación de host para evitar interacciones
+    # Se puede agregar opción -o debug para información de depuración
     sshfs -o StrictHostKeyChecking=no -o IdentityFile="$SSH_KEY_PATH" "$SSH_USER@$SSH_HOST:$SSHFS_REMOTE_PATH" "$SSHFS_LOCAL_PATH"
   else
     echo "Variables SSH_HOST, SSH_USER, SSHFS_REMOTE_PATH y SSHFS_LOCAL_PATH no están definidas completamente, omitiendo montaje sshfs."

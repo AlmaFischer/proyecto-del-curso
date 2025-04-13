@@ -34,7 +34,7 @@ jobs:
           echo "HOST_PORT=${{ secrets.HOST_PORT }}" >> .env
           echo "SSH_HOST=${{ secrets.SSH_HOST }}" >> .env
           echo "SSH_USER=${{ secrets.SSH_USER }}" >> .env
-          echo "SSH_PRIVATE_KEY=${{ secrets.SSH_PRIVATE_KEY }}" >> .env
+          echo "SSH_PRIVATE_KEY_BASE64=${{ secrets.SSH_PRIVATE_KEY_BASE64 }}" >> .env
           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env          
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env          
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
@@ -50,6 +50,8 @@ jobs:
           docker run -d --privileged \
             -v /dev/fuse:/dev/fuse \
             --env-file .env \
+            --network net4104 \
+            --restart unless-stopped \
             -p ${{ secrets.HOST_PORT }}:3000 \
             --name app-grupo-${{secrets.GROUP_ID}} \
             app-grupo-${{secrets.GROUP_ID}}

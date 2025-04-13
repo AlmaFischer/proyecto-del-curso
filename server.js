@@ -386,32 +386,39 @@ app.get("/admin/download/:filename", isAuthenticated, isAdmin, async (req, res) 
 });
 
 // Endpoint para subir archivos al servidor local.
-app.post("/upload", upload.single("file"), isAuthenticated, isAdmin, async (req, res) => {
+app.post("/upload", upload.single("file"), isAuthenticated, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  
+
   const userId = req.session.userId;
+  const isAdmin = req.session.isAdmin;
   const fileName = path.parse(req.file.originalname).name;
-  
+
   try {
-    const dbResult = await pool.query(
-      `SELECT d.id FROM documents d
-       JOIN document_entities de ON d.id = de.document_id
-       JOIN entities e ON de.entity_id = e.id
-       WHERE e.user_id = $1 AND d.file = $2`,
-      [userId, fileName]
-    );
-    
-    if (dbResult.rows.length === 0) {
-      return res.status(403).json({ error: "You do not have permission to upload this file." });
+    if (!isAdmin) {
+      // Validar si este archivo le pertenece al usuario
+      const dbResult = await pool.query(
+        `SELECT d.id FROM documents d
+         JOIN document_entities de ON d.id = de.document_id
+         JOIN entities e ON de.entity_id = e.id
+         WHERE e.user_id = $1 AND d.file = $2`,
+        [userId, fileName]
+      );
+
+      if (dbResult.rows.length === 0) {
+        return res.status(403).json({ error: "No tienes permiso para subir este archivo." });
+      }
     }
-    
+
+    // Guardar archivo
     const filePath = path.join(FILES_DIR, req.file.originalname);
-    fs.writeFile(filePath, req.file.buffer, async (err) => {
-      if (err) return res.status(500).json({ error: "Error saving file", details: err.message });
+    fs.writeFile(filePath, req.file.buffer, (err) => {
+      if (err) return res.status(500).json({ error: "Error al guardar el archivo", details: err.message });
+
       res.json({ success: true, file: req.file.originalname });
     });
+
   } catch (error) {
-    res.status(500).json({ error: "Error uploading file", details: error.message });
+    res.status(500).json({ error: "Error en el servidor", details: error.message });
   }
 });
 
