@@ -211,13 +211,39 @@ app.post("/api/documents/:documentId/comments", isAuthenticated, async (req, res
     const { documentId } = req.params;
     const { content } = req.body;
     const userId = req.session.userId;
+    const isAdmin = req.session.isAdmin;
 
     // Validación básica
     if (!content || content.trim() === "") {
       return res.status(400).json({ error: "El comentario no puede estar vacío" });
     }
 
-    // Insertar en la base de datos
+    if (!isAdmin) {
+      // Validar que el documento pertenece al usuario
+      const verifyDoc = await pool.query(
+        `SELECT 1 FROM documents d
+         JOIN document_entities de ON d.id = de.document_id
+         JOIN entities e ON de.entity_id = e.id
+         WHERE d.id = $1 AND e.user_id = $2`,
+        [documentId, userId]
+      );
+
+      if (verifyDoc.rowCount === 0) {
+        return res.status(403).json({ error: "No tienes permiso para comentar este documento" });
+      }
+    } else {
+      // El admin puede comentar cualquier documento, pero validamos que exista
+      const docExists = await pool.query(
+        `SELECT 1 FROM documents WHERE id = $1`,
+        [documentId]
+      );
+
+      if (docExists.rowCount === 0) {
+        return res.status(404).json({ error: "El documento no existe" });
+      }
+    }
+
+    // Insertar el comentario
     const result = await pool.query(
       `INSERT INTO comments (user_id, document_id, content)
        VALUES ($1, $2, $3) RETURNING *`,
