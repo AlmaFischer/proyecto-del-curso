@@ -30,14 +30,15 @@
           </div>
         </div>
 
-        <!-- Sección para gestionar usuarios -->
-        <div class="row mb-4">
-          <div class="col-md-12">
-            <div class="card shadow-sm">
+        <div class="row">
+          <!-- Columna Izquierda - Secciones largas con scroll -->
+          <div class="col-md-6">
+            <!-- Sección usuarios (altura fija con scroll) -->
+            <div class="card shadow-sm mb-4 h-100">
               <div class="card-header bg-dark text-white">
                 <label class="mb-0">Gestión de Usuarios</label>
               </div>
-              <div class="card-body">
+              <div class="card-body d-flex flex-column">
                 <!-- Barra de búsqueda -->
                 <div class="mb-3">
                   <input 
@@ -49,8 +50,8 @@
                   />
                 </div>
 
-                <!-- Lista de usuarios -->
-                <div class="list-group">
+                <!-- Lista de usuarios con scroll -->
+                <div class="list-group flex-grow-1 overflow-auto" style="max-height: 400px;">
                   ${state.users?.map(user => html`
                     <div 
                       class="list-group-item list-group-item-action"
@@ -62,15 +63,15 @@
                           <h5>${user.username}</h5>
                           <small class="text-muted">${user.email}</small>
                         </div>
-                          <small>Email: ${user.email}</small>
-                        </div>
+                        <small>ID: ${user.id}</small>
+                      </div>
                     </div>
                   `)}
                 </div>
 
-                <!-- Detalles del usuario seleccionado -->
+                <!-- Detalles usuario (siempre visible) -->
                 ${state.selectedUser ? html`
-                  <div class="mt-4 p-3 border rounded">
+                  <div class="mt-4 p-3 border rounded flex-shrink-0">
                     <h4>Detalles de ${state.selectedUser.username}</h4>
                     <p>Email: ${state.selectedUser.email}</p>
                     
@@ -82,7 +83,7 @@
                               <div class="list-group-item">
                                 <div class="d-flex justify-content-between">
                                   <span>
-                                    ${doc.document_type} - <!-- file ahora es pdf_path -->
+                                    ${doc.document_type} -
                                     <small class="text-muted">nombre: ${doc.base_name}</small>
                                   </span>
                                 </div>
@@ -96,12 +97,11 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Sección para probar POST /upload -->
-        <div class="row mb-4">
+          <!-- Columna Derecha - Secciones de archivos -->
           <div class="col-md-6">
-            <div class="card shadow-sm">
+            <!-- Subir archivo -->
+            <div class="card shadow-sm mb-4">
               <div class="card-header bg-primary text-white">
                 <label class="mb-0">Subir Archivo (POST /upload)</label>
               </div>
@@ -117,13 +117,9 @@
                   : ''}
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Sección para probar GET /download/:filename -->
-        <div class="row mb-4">
-          <div class="col-md-6">
-            <div class="card shadow-sm">
+            <!-- Descargar archivo -->
+            <div class="card shadow-sm mb-4">
               <div class="card-header bg-success text-white">
                 <label class="mb-0">Descargar Archivo (ADMIN GET /admin/download/:filename)</label>
               </div>
@@ -135,18 +131,14 @@
                   <button @click=${downloadFile} class="btn btn-success">Descargar Archivo</button>
                 </div>
                 ${state.downloadMessage 
-                ? html`<div class="mt-2 alert ${state.downloadMessage.includes('Error') 
-                    ? 'alert-danger' 
-                    : 'alert-info'}">${state.downloadMessage}</div>` 
-                : ''}
+                  ? html`<div class="mt-2 alert ${state.downloadMessage.includes('Error') 
+                      ? 'alert-danger' 
+                      : 'alert-info'}">${state.downloadMessage}</div>` 
+                  : ''}
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Sección para probar GET /files -->
-        <div class="row mb-4">
-          <div class="col-md-6">
+            <!-- Listar archivos con scroll -->
             <div class="card shadow-sm">
               <div class="card-header bg-secondary text-white">
                 <label class="mb-0">Listar Archivos (GET /files)</label>
@@ -155,13 +147,12 @@
                 <div class="d-grid mb-3">
                   <button @click=${listFiles} class="btn btn-secondary">Listar Archivos</button>
                 </div>
-                <div>
+                <div class="overflow-auto" style="max-height: 500px;">
                   ${state.filesList 
                     ? html`
                         <div class="list-group">
                           ${state.filesList.map(document => html`
                             <div class="list-group-item">
-                              <!-- Encabezado del documento -->
                               <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                   <span class="badge bg-primary me-2">${document.documentType}</span>
@@ -175,7 +166,6 @@
                                 </button>
                               </div>
                               
-                              <!-- Comentarios (se muestra solo si está expandido) -->
                               ${state.expandedDocumentId === document.documentId ? html`
                                 <div class="mt-3">
                                   <h6 class="mb-2">Comentarios:</h6>
@@ -197,37 +187,29 @@
                                           `)}
                                         </div>
                                       `
-                                    : html`<div class="text-muted">No hay comentarios</div>`
-                                  }
+                                    : html`<div class="text-muted">No hay comentarios</div>`}
+                                  <div class="mt-4">
+                                    <textarea 
+                                      class="form-control mb-2"
+                                      placeholder="Escribe tu comentario..."
+                                      rows="2"
+                                      .value=${state.newComment}
+                                      @input=${(e) => state.newComment = e.target.value}
+                                    ></textarea>
+                                    <button 
+                                      class="btn btn-primary btn-sm"
+                                      @click=${() => addComment(document.documentId)}
+                                    >
+                                      Enviar comentario
+                                    </button>
+                                  </div>
                                 </div>
-                                
                               ` : ''}
-                              <div class="mt-3">
-                                <!-- ... (comentarios existentes) -->
-
-                                <!-- Formulario para nuevo comentario -->
-                                <div class="mt-4">
-                                  <textarea 
-                                    class="form-control mb-2"
-                                    placeholder="Escribe tu comentario..."
-                                    rows="2"
-                                    .value=${state.newComment}
-                                    @input=${(e) => state.newComment = e.target.value}
-                                  ></textarea>
-                                  <button 
-                                    class="btn btn-primary btn-sm"
-                                    @click=${() => addComment(document.documentId)}
-                                  >
-                                    Enviar comentario
-                                  </button>
-                                </div>
-                              </div>
                             </div>
                           `)}
                         </div>
                       `
-                    : html`<div class="alert alert-secondary">No hay archivos listados.</div>`
-                  }
+                    : html`<div class="alert alert-secondary">No hay archivos listados.</div>`}
                 </div>
               </div>
             </div>
