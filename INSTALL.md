@@ -15,6 +15,11 @@ Si un usuario tiene el correo **"juan.perez@example.com"**, el sistema generará
 - **Nombre de usuario**: `juan.pereze`
 - **Contraseña**: `juan.perez_2025` *(solo toma lo que esta antes del @)*
 
+## Credenciales de admin
+Porfavor no robar :c
+- **Nombre de usuario**: `sg`
+- **Contraseña**: `sg_2025`
+
 > Las contraseñas se generan dinámicamente en el script de inserción de datos, por lo que cada usuario tendrá una contraseña única basada en su correo.
 > La base de datos se llena al ejecutar "docker compose up", no se vuelve a ejecutar si es que ya esta poblada la BBDD.
 
