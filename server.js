@@ -412,7 +412,7 @@ app.get("/admin/download/:filename", isAuthenticated, isAdmin, async (req, res) 
 });
 
 // Endpoint para subir archivos al servidor local.
-app.post("/upload", upload.single("file"), isAuthenticated, async (req, res) => {
+app.post("/upload", upload.single("file"), isAuthenticated, isAdmin, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const userId = req.session.userId;
