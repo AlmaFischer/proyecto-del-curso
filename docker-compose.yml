@@ -5,19 +5,19 @@ services:
     build: .
     ports:
       - "3000:3000"
+    env_file: .env  # <-- Variables sensibles aquí
     environment:
       NODE_ENV: development
       DB_HOST: db
       DB_USER: dbuser
-      DB_PASS: dbpass
       DB_NAME: app_db
-      SESSIONS_SECRET: shhh
       INIT_DB: "false"
     volumes:
-      - ./:/app
-      - ./files:/app/files  # Carpeta local "files" se mapea dentro del contenedor
+      - ./:/app  # Solo la carpeta "app"
+      - ./files:/app/files
     depends_on:
-      - db
+      db:
+        condition: service_healthy  # Espera a que la DB esté lista
 
   db:
     image: postgres:latest
@@ -30,6 +30,11 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:  # <-- Healthcheck agregado
+      test: ["CMD-SHELL", "pg_isready -U dbuser -d app_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db_data:

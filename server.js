@@ -448,6 +448,102 @@ app.post("/upload", upload.single("file"), isAuthenticated, async (req, res) => 
   }
 });
 
+// Endpoint para listar todos los usuarios (con búsqueda opcional)
+app.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const searchTerm = req.query.search || "";
+    
+    const query = `
+      SELECT id, username, email
+      FROM users
+      WHERE username ILIKE $1 OR email ILIKE $1
+      ORDER BY username ASC
+    `;
+    
+    const result = await pool.query(query, [`%${searchTerm}%`]);
+    
+    res.json({ 
+      success: true, 
+      users: result.rows 
+    });
+    
+  } catch (error) {
+    handleAdminError(res, error, "Error al obtener usuarios");
+  }
+});
+
+// Endpoint para obtener detalles de un usuario y sus documentos
+app.get("/admin/users/:userId", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Obtener información del usuario
+    const userQuery = await pool.query(
+      `SELECT id, username, email 
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    // Obtener documentos asociados
+    const documentsQuery = await pool.query(
+      `SELECT d.id, d.file as base_name, d.document_type, d.sha256 
+       FROM documents d
+       JOIN document_entities de ON d.id = de.document_id
+       JOIN entities e ON de.entity_id = e.id
+       WHERE e.user_id = $1`,
+      [userId]
+    );
+
+    // Procesar archivos físicos
+    const processedDocuments = await Promise.all(
+      documentsQuery.rows.map(async (doc) => {
+        const files = [];
+        let displayName = doc.base_name;
+        
+        // Verificar existencia de archivos
+        const possibleExtensions = ['.pdf', '.md'];
+        possibleExtensions.forEach(ext => {
+          const fullPath = path.join(FILES_DIR, `${doc.base_name}${ext}`);
+          if (fs.existsSync(fullPath)) {
+            files.push(`${doc.base_name}${ext}`);
+            if (ext === '.pdf') displayName = `${doc.base_name}${ext}`;
+          }
+        });
+
+        // Obtener comentarios (si los necesitas)
+        const commentsQuery = await pool.query(
+          `SELECT c.id, c.content, c.created_at, u.username 
+           FROM comments c
+           JOIN users u ON c.user_id = u.id
+           WHERE c.document_id = $1
+           ORDER BY c.created_at DESC`,
+          [doc.id]
+        );
+
+        return {
+          ...doc,
+          displayName,
+          files,
+          comments: commentsQuery.rows
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      user: userQuery.rows[0],
+      documents: processedDocuments
+    });
+
+  } catch (error) {
+    handleAdminError(res, error, "Error al obtener detalles del usuario");
+  }
+});
+
 // ============================================
 // SECCIÓN 6: MANEJO DE ERRORES Y UTILIDADES
 // ============================================
@@ -456,6 +552,7 @@ app.post("/upload", upload.single("file"), isAuthenticated, async (req, res) => 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 const { exec } = require("child_process");
+
 async function checkAndSeedDatabase() {
   try {
     const result = await pool.query("SELECT COUNT(*) FROM users");

@@ -14,7 +14,10 @@
       downloadMessage: '',
       filesList: null,
       newComment: '',
-      expandedDocumentId: null
+      expandedDocumentId: null,
+      users: null,
+      selectedUser: null,
+      userDocuments: []
     };
 
     // Plantilla principal con secciones para probar cada endpoint.
@@ -24,6 +27,74 @@
         <div class="row mb-4">
           <div class="col">
             <label class="form-label fs-2">DocLocker - Home Admin | API Test Page</label>
+          </div>
+        </div>
+
+        <!-- Sección para gestionar usuarios -->
+        <div class="row mb-4">
+          <div class="col-md-12">
+            <div class="card shadow-sm">
+              <div class="card-header bg-dark text-white">
+                <label class="mb-0">Gestión de Usuarios</label>
+              </div>
+              <div class="card-body">
+                <!-- Barra de búsqueda -->
+                <div class="mb-3">
+                  <input 
+                    id="user-search" 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="Buscar por nombre o email..."
+                    @input=${(e) => searchUsers(e.target.value)}
+                  />
+                </div>
+
+                <!-- Lista de usuarios -->
+                <div class="list-group">
+                  ${state.users?.map(user => html`
+                    <div 
+                      class="list-group-item list-group-item-action"
+                      @click=${() => loadUserDetails(user.id)}
+                      style="cursor: pointer;"
+                    >
+                      <div class="d-flex justify-content-between">
+                        <div>
+                          <h5>${user.username}</h5>
+                          <small class="text-muted">${user.email}</small>
+                        </div>
+                          <small>Email: ${user.email}</small>
+                        </div>
+                    </div>
+                  `)}
+                </div>
+
+                <!-- Detalles del usuario seleccionado -->
+                ${state.selectedUser ? html`
+                  <div class="mt-4 p-3 border rounded">
+                    <h4>Detalles de ${state.selectedUser.username}</h4>
+                    <p>Email: ${state.selectedUser.email}</p>
+                    
+                    <h5>Documentos Asociados</h5>
+                    ${state.userDocuments.length > 0 
+                      ? html`
+                          <div class="list-group">
+                            ${state.userDocuments.map(doc => html`
+                              <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                  <span>
+                                    ${doc.document_type} - <!-- file ahora es pdf_path -->
+                                    <small class="text-muted">nombre: ${doc.base_name}</small>
+                                  </span>
+                                </div>
+                              </div>
+                            `)}
+                          </div>
+                        `
+                      : html`<div class="alert alert-info">No hay documentos registrados</div>`}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -196,88 +267,116 @@
     // Función para manejar la descarga de un archivo
 
     async function downloadFile() {
-  const filename = document.getElementById('download-filename').value.trim();
-  if (!filename) {
-    state.downloadMessage = 'Ingrese el nombre del archivo a descargar.';
-    return update();
-  }
-
-  try {
-    const response = await axios.get(`/admin/download/${encodeURIComponent(filename)}`, {
-      responseType: 'blob',
-      validateStatus: (status) => status === 200 || (status >= 400 && status < 500)
-    });
-
-    if (response.status === 200) {
-      // Crear enlace de descarga
-      const url = window.URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      state.downloadMessage = 'Descarga iniciada...';
-    } else {
-      // Manejar errores de la API
-      const errorData = JSON.parse(await response.data.text());
-      state.downloadMessage = `Error: ${errorData.error || 'Error desconocido'}`;
-    }
-  } catch (error) {
-    state.downloadMessage = `Error: ${error.message}`;
-  }
-  update();
-}
-
-    // Función para listar archivos disponibles
-    async function listFiles() {
-      try { 
-        const response = await axios.get(`files`);
-        if (response.data.success) {
-          state.filesList = response.data.data; // Cambia 'files' por 'data'
-        } else {
-          state.filesList = [];
-        }
-      } catch (error) {
-        state.filesList = [];
-        state.uploadMessage = `Error: ${error.response ? error.response.data.error : error.message}`;
-      }
-      update();
-    }
-
-    // Función para expandir/colapsar comentarios
-    function toggleComments(documentId) {
-      state.expandedDocumentId = state.expandedDocumentId === documentId 
-        ? null 
-        : documentId;
-      update();
-    }
-
-    async function addComment(documentId) {
-      if (!state.newComment.trim()) {
-        alert("El comentario no puede estar vacío");
-        return;
+      const filename = document.getElementById('download-filename').value.trim();
+      if (!filename) {
+        state.downloadMessage = 'Ingrese el nombre del archivo a descargar.';
+        return update();
       }
 
       try {
-        const response = await axios.post(
-          `/api/documents/${documentId}/comments`,
-          { content: state.newComment }
-        );
+        const response = await axios.get(`/admin/download/${encodeURIComponent(filename)}`, {
+          responseType: 'blob',
+          validateStatus: (status) => status === 200 || (status >= 400 && status < 500)
+        });
 
-        if (response.data.success) {
-          // Actualizar la lista de comentarios localmente
-          const document = state.filesList.find(doc => doc.documentId === documentId);
-          document.comments.unshift(response.data.comment); // Agregar al inicio
-          state.newComment = ""; // Limpiar el textarea
-          update();
+        if (response.status === 200) {
+          // Crear enlace de descarga
+          const url = window.URL.createObjectURL(response.data);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', filename);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          state.downloadMessage = 'Descarga iniciada...';
+        } else {
+          // Manejar errores de la API
+          const errorData = JSON.parse(await response.data.text());
+          state.downloadMessage = `Error: ${errorData.error || 'Error desconocido'}`;
         }
+      } catch (error) {
+        state.downloadMessage = `Error: ${error.message}`;
+      }
+      update();
+    }
+
+    // Función para listar archivos disponibles
+    async function listFiles() {
+        try { 
+          const response = await axios.get(`files`);
+          if (response.data.success) {
+            state.filesList = response.data.data; // Cambia 'files' por 'data'
+          } else {
+            state.filesList = [];
+          }
+        } catch (error) {
+          state.filesList = [];
+          state.uploadMessage = `Error: ${error.response ? error.response.data.error : error.message}`;
+        }
+        update();
+      }
+
+    // Función para expandir/colapsar comentarios
+    function toggleComments(documentId) {
+        state.expandedDocumentId = state.expandedDocumentId === documentId 
+          ? null 
+          : documentId;
+        update();
+      }
+
+    async function addComment(documentId) {
+        if (!state.newComment.trim()) {
+          alert("El comentario no puede estar vacío");
+          return;
+        }
+
+        try {
+          const response = await axios.post(
+            `/api/documents/${documentId}/comments`,
+            { content: state.newComment }
+          );
+
+          if (response.data.success) {
+            // Actualizar la lista de comentarios localmente
+            const document = state.filesList.find(doc => doc.documentId === documentId);
+            document.comments.unshift(response.data.comment); // Agregar al inicio
+            state.newComment = ""; // Limpiar el textarea
+            update();
+          }
+        } catch (error) {
+          alert(`Error: ${error.response?.data.error || error.message}`);
+        }
+      } 
+
+    // Función para buscar usuarios
+    async function searchUsers(term) {
+      try {
+        const response = await axios.get(`/admin/users?search=${encodeURIComponent(term)}`);
+        state.users = response.data.users;
+        update();
+      } catch (error) {
+        console.error("Error buscando usuarios:", error);
+      }
+    }
+
+    // Función para cargar detalles del usuario
+    async function loadUserDetails(userId) {
+      try {
+        const response = await axios.get(`/admin/users/${userId}`);
+        if (response.data.success) {
+          state.selectedUser = response.data.user;
+          state.userDocuments = response.data.documents;
+        } else {
+          alert(response.data.error || "Error desconocido");
+        }
+        update();
       } catch (error) {
         alert(`Error: ${error.response?.data.error || error.message}`);
       }
-    } 
+    }
 
-
+    // Llamar a searchUsers al cargar la página
+    searchUsers("");
     // Inicializar la vista
     update();
   });
