@@ -18,8 +18,3 @@ Si un usuario tiene el correo **"juan.perez@example.com"**, el sistema generará
 > Las contraseñas se generan dinámicamente en el script de inserción de datos, por lo que cada usuario tendrá una contraseña única basada en su correo.
 > La base de datos se llena al ejecutar "docker compose up", no se vuelve a ejecutar si es que ya esta poblada la BBDD.
 
-
-## Recueros importantes
-acuerdate de sacar a el administrador de install.md
-revisar los comments, cualquier persona puede comentar cualquer documento
-

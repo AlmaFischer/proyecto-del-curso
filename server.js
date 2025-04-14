@@ -100,6 +100,7 @@ app.post("/login", async (req, res) => {
     });
   }
 
+
   try {
     const result = await pool.query(
       `SELECT id, is_admin FROM users 
@@ -111,13 +112,20 @@ app.post("/login", async (req, res) => {
     if (result.rows.length > 0) {
       req.session.userId = result.rows[0].id;
       req.session.isAdmin = result.rows[0].is_admin;
-
+    
+      // NUEVO: guardar nombre de usuario en la sesión
+      const userInfo = await pool.query(
+        `SELECT username, email FROM users WHERE id = $1`,
+        [result.rows[0].id]
+      );
+      req.session.username = userInfo.rows[0].username;
+      req.session.email = userInfo.rows[0].email;
+    
       const redirectPath = result.rows[0].is_admin ? "/admin/home" : "/home";
       res.json({ 
         result: true, 
-        redirect: redirectPath // Enviar ruta al frontend
+        redirect: redirectPath
       });
-
     } else {
       res.status(401).json({ 
         result: false, 
@@ -131,6 +139,11 @@ app.post("/login", async (req, res) => {
     });
   }
 });
+app.get("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    res.redirect("/login");
+  });
+});
 
 
 
@@ -138,8 +151,14 @@ app.post("/login", async (req, res) => {
 // SECCIÓN 4: RUTAS DE USUARIO AUTENTICADO
 // ============================================
 
-app.get("/home",isAuthenticated, (req, res) => {
-  res.render("home", { title: "DocLocker",user: {isAdmin: req.session.isAdmin} });
+app.get("/home", isAuthenticated, (req, res) => {
+  res.render("home", { 
+    title: "DocLocker", 
+    user: {
+      isAdmin: req.session.isAdmin,
+      username: req.session.username
+    } 
+  });
 });
 
 // Endpoint para listar archivos del usuario autenticado.

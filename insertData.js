@@ -33,10 +33,10 @@ async function insertData() {
       `SELECT id, username, email FROM users WHERE username = 'sg'`
     );
     if (adminCheck.rows.length > 0) {
-      console.log('✅ Usuario administrador creado correctamente:');
+      console.log('Usuario administrador creado correctamente:');
       console.log(adminCheck.rows[0]);
     } else {
-      console.log('❌ No se pudo crear el usuario administrador');
+      console.log('No se pudo crear el usuario administrador');
     }
 
 
