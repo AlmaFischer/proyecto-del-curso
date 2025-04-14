@@ -490,7 +490,39 @@ app.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     handleAdminError(res, error, "Error al obtener usuarios");
   }
 });
+// Endpoint para eliminar archivos del sistema (solo admins)
+app.delete("/admin/delete/:filename", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { filename } = req.params;
 
+    const filePath = path.join(FILES_DIR, filename);
+
+    // Verificar si el archivo existe
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: "Archivo no encontrado",
+        details: `El archivo ${filename} no existe en el sistema`
+      });
+    }
+
+    // Eliminar archivo
+    fs.unlinkSync(filePath);
+
+    res.json({
+      success: true,
+      message: `Archivo ${filename} eliminado del sistema`
+    });
+
+  } catch (error) {
+    console.error("[ADMIN DELETE ERROR]", error);
+    res.status(500).json({
+      success: false,
+      error: "Error al eliminar el archivo",
+      details: error.message
+    });
+  }
+});
 // Endpoint para obtener detalles de un usuario y sus documentos
 app.get("/admin/users/:userId", isAuthenticated, isAdmin, async (req, res) => {
   try {

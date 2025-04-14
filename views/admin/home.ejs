@@ -138,6 +138,30 @@
               </div>
             </div>
 
+            <!-- Eliminar archivo -->
+            <div class="card shadow-sm mb-4">
+              <div class="card-header bg-danger text-white">
+                <label class="mb-0">Eliminar Archivo (ADMIN DELETE /admin/delete/:filename)</label>
+              </div>
+              <div class="card-body">
+                <div class="alert alert-warning">
+                   Esta acción eliminará el archivo de forma <strong>permanente</strong>. No se puede deshacer.
+                </div>
+                <div class="mb-3">
+                  <input id="delete-filename" type="text" placeholder="Nombre del archivo" class="form-control" />
+                </div>
+                <div class="d-grid">
+                  <button @click=${deleteFile} class="btn btn-danger">Eliminar Archivo</button>
+                </div>
+                ${state.deleteMessage 
+                  ? html`<div class="mt-2 alert ${state.deleteMessage.includes('Error') 
+                      ? 'alert-danger' 
+                      : 'alert-success'}">${state.deleteMessage}</div>` 
+                  : ''}
+              </div>
+            </div>
+
+
             <!-- Listar archivos con scroll -->
             <div class="card shadow-sm">
               <div class="card-header bg-secondary text-white">
@@ -362,4 +386,28 @@
     // Inicializar la vista
     update();
   });
+
+  async function deleteFile() {
+  const filename = document.getElementById('delete-filename').value.trim();
+  if (!filename) {
+    state.deleteMessage = 'Ingrese el nombre del archivo a eliminar.';
+    return update();
+  }
+
+  const confirmDelete = confirm(`¿Estás seguro de que deseas eliminar el archivo "${filename}" de forma permanente?`);
+  if (!confirmDelete) return;
+
+  try {
+    const response = await axios.delete(`/admin/delete/${encodeURIComponent(filename)}`);
+    if (response.data.success) {
+      state.deleteMessage = `Archivo "${filename}" eliminado correctamente.`;
+      await listFiles(); // refrescar lista
+    } else {
+      state.deleteMessage = `Error: ${response.data.error || 'No se pudo eliminar el archivo.'}`;
+    }
+  } catch (error) {
+    state.deleteMessage = `Error: ${error.response?.data.error || error.message}`;
+  }
+  update();
+}
 </script>
