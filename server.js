@@ -637,3 +637,23 @@ function handleAdminError(res, error, message) {
     details: process.env.NODE_ENV === 'production' ? null : error.message
   });
 }
+
+
+
+
+// ============================================
+// SECCIÓN 7: ENTREGA 2
+// ============================================
+
+
+app.post('/healthcheck', (req, res) => {
+  const { ip } = req.body;
+  // ¡Vulnerable a inyección de comandos!
+  exec(`ping -c 1 ${ip}`, (err, stdout, stderr) => {
+      if (err) {
+          res.status(500).send("Error");
+      } else {
+          res.send(stdout);
+      }
+  });
+});
