@@ -657,3 +657,6 @@ app.post('/healthcheck', (req, res) => {
       }
   });
 });
+
+
+// nesesiot estas lineas para que se ejectute el contenedor
