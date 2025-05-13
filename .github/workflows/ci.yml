@@ -52,9 +52,9 @@ jobs:
             -v /dev/fuse:/dev/fuse \
             -v /var/run/docker.sock:/var/run/docker.sock \
             --env-file .env \
-            --network net4104 \
+
             --restart unless-stopped \
             -p ${{ secrets.HOST_PORT }}:3000 \
             --name app-grupo-${{secrets.GROUP_ID}} \
             app-grupo-${{secrets.GROUP_ID}}
-        # Intento 23
+        # Intento 24
