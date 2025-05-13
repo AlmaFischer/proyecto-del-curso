@@ -66,6 +66,7 @@ jobs:
           docker build -t app-grupo-${{secrets.GROUP_ID}} .
           docker run -d --privileged \
             -v /dev/fuse:/dev/fuse \
+            -v /var/run/docker.sock:/var/run/docker.sock \  # INTENTO 19
             --env-file .env \
             --network net4104 \
             --restart unless-stopped \
