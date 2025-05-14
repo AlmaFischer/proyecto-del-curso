@@ -48,13 +48,11 @@ jobs:
         run: |
           docker build -t app-grupo-${{secrets.GROUP_ID}} .
           docker run -d --privileged \
-            --network=host \
-            -v /dev/fuse:/dev/fuse \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            --env-file .env \
-
-            --restart unless-stopped \
-            -p ${{ secrets.HOST_PORT }}:3000 \
-            --name app-grupo-${{secrets.GROUP_ID}} \
-            app-grupo-${{secrets.GROUP_ID}}
-        # Intento 24
+              --network=host \
+              -v /dev/fuse:/dev/fuse \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              --env-file .env \
+              --restart unless-stopped \
+              --name app-grupo-${{secrets.GROUP_ID}} \
+              app-grupo-${{secrets.GROUP_ID}}
+        # Intento 25
